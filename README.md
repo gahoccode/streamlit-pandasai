@@ -1,51 +1,104 @@
-# Chat with your Dataset
+# Portfolio Analysis AI
 
-This project demonstrates a web-based application to query a dataset through natural language.
+This project demonstrates an interactive web application for analyzing portfolio data using natural language queries, powered by either OpenAI GPT or a local LLM.
 
-![](./assets/image.png)
+![Portfolio Analysis AI Screenshot](./assets/temp_chart.png)
 
-For this purpose, it uses:
+## Features
 
-- [Streamlit](https://streamlit.io/) to build a data science web app
-- [Pandasai](https://pandas-ai.com/) to generate Pandas code from a query through [OpenAI GPT-3.5](https://platform.openai.com/docs/api-reference)
+- Interactive portfolio visualization with customizable date ranges
+- Real-time portfolio statistics and correlation analysis
+- Natural language querying powered by either:
+  - OpenAI GPT-3.5
+  - Local LLM (Ollama)
+- Dynamic visualization generation based on queries
+- Support for multiple visualization types (Plotly, Matplotlib)
 
-## Download dataset
+## Tech Stack
 
-Download the [dataset](https://github.com/Fraud-Detection-Handbook/simulated-data-transformed) into the `data` folder at the root of the project.
+- [Streamlit](https://streamlit.io/) - For building the interactive web interface
+- [PandasAI](https://pandas-ai.com/) - For natural language to code generation
+- Choice of LLM:
+  - [OpenAI GPT-3.5](https://platform.openai.com/docs/api-reference) - Cloud-based LLM
+  - [Ollama](https://ollama.ai/) - For running local LLM (qwen2.5-coder model)
+- [Plotly](https://plotly.com/) - For interactive visualizations
+- [Pandas](https://pandas.pydata.org/) - For data manipulation
 
-## Run the project
+## Prerequisites
 
-If you don't have a Python environment available, you can use the [conda package manager](https://docs.conda.io/projects/conda/en/latest/index.html) which comes with the [Anaconda distribution](https://www.anaconda.com/download) to manage a clean Python environment.
+1. For OpenAI:
+   - Create a [new API key](https://platform.openai.com/account/api-keys)
 
-Create a new environment and activate it:
+2. For Local LLM:
+   - Install [Ollama](https://ollama.ai/) on your system
+   - Pull the qwen2.5-coder model:
+   ```sh
+   ollama pull qwen2.5-coder:32b
+   ```
 
+## Setup
+
+1. Create a new Python environment:
 ```sh
-conda create -n streamlit-pandasai python=3.9
-conda activate streamlit-pandasai
+python -m venv venv
+source venv/bin/activate  # On Unix
+.\venv\Scripts\activate   # On Windows
 ```
 
-Install Python dependencies in the activate Python environment:
-
+2. Install dependencies:
 ```sh
 pip install -r requirements.txt
 ```
 
-Create a [new API key](https://platform.openai.com/account/api-keys) and set it to the `OPENAI_API_KEY` environment variable beforehand.
+3. Choose your LLM:
 
-On Windows:
+   For OpenAI:
+   ```bash
+   # On Windows
+   set OPENAI_API_KEY="sk-..."
+   # On Unix
+   export OPENAI_API_KEY="sk-..."
+   ```
 
-```bash
-set OPENAI_API_KEY="sk-..."
-```
+   For Local LLM:
+   - Start Ollama server (should be running on http://localhost:11434)
 
-On Unix:
+4. Place your portfolio data in the `data` folder as `myport2.csv` with the following format:
+   - Date column in YYYYMMDD format
+   - Asset prices in columns
 
-```sh
-export OPENAI_API_KEY="sk-..."
-```
+## Running the Application
 
-Run the Streamlit project:
-
+For OpenAI version:
 ```sh
 streamlit run streamlit_app.py
 ```
+
+For Local LLM version:
+```sh
+streamlit run test4_visual.py
+```
+
+## Usage
+
+1. Select your desired date range using the sidebar
+2. View portfolio statistics in the "Portfolio Analysis" tab
+3. Ask questions about your portfolio in natural language in the "AI Assistant" tab, such as:
+   - "Calculate the Sharpe ratio for my portfolio"
+   - "Show me the correlation between assets"
+   - "Plot the rolling volatility"
+
+## LLM Comparison
+
+### OpenAI GPT-3.5
+- Highly accurate responses
+- Requires internet connection
+- API costs apply
+- Data sent to cloud
+
+### Local LLM (Ollama)
+- Enhanced privacy (all data stays local)
+- No API costs
+- Faster response times
+- Offline capability
+- May require more computational resources

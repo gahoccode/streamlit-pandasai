@@ -74,7 +74,9 @@ smart_df = SmartDataframe(
         "llm": ollama_llm,
         "custom_prompts": {
             "generate_python_code": "Generate Python code to answer the following question about the dataframe: {question}"
-        }
+        },
+        "cache": None,
+        "use_cache": False
     }
 )
 

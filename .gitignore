@@ -27,9 +27,10 @@ env/
 .env
 
 # Project specific
-#data/
+data/
 cache/
 pandasai.log
+instructions.md
 
 # IDE specific
 .idea/
@@ -40,3 +41,20 @@ pandasai.log
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Build and packaging
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
