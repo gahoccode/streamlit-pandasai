@@ -35,7 +35,7 @@ class StreamlitResponse(ResponseParser):
         return
 
 
-st.write("# Chat with Credit Card Fraud Dataset 🦙")
+st.write("# Chat with Dataset 🦙")
 
 df = load_data("./data")
 
