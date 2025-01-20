@@ -27,7 +27,7 @@ env/
 .env
 
 # Project specific
-data/
+#data/
 cache/
 pandasai.log
 
