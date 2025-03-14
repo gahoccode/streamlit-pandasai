@@ -1,6 +1,6 @@
 import streamlit as st
 from pandasai import SmartDataframe
-from pandasai.llm.local_llm import LocalLLM
+from pandasai.llm import OpenAI
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -8,6 +8,60 @@ from io import StringIO
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
+import os
+from dotenv import load_dotenv
+import pandasai.helpers.cache
+import duckdb
+
+# Load environment variables
+load_dotenv()
+
+# Create a custom cache class to completely replace the original implementation
+class CustomCache:
+    def __init__(self):
+        self.filepath = ":memory:"
+        self.connection = duckdb.connect(self.filepath)
+        self.enabled = True
+        
+        # Create the cache table with the correct schema
+        self.connection.execute("""
+            CREATE TABLE IF NOT EXISTS cache (
+                id INTEGER PRIMARY KEY,
+                key TEXT,
+                value TEXT,
+                prompt TEXT,
+                response TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    
+    def get(self, key):
+        result = self.connection.execute("SELECT value FROM cache WHERE key=?", [key]).fetchone()
+        if result:
+            return result[0]
+        return None
+    
+    def set(self, key, value):
+        self.connection.execute(
+            "INSERT INTO cache (key, value) VALUES (?, ?)",
+            [key, value]
+        )
+    
+    def has(self, key):
+        result = self.connection.execute("SELECT 1 FROM cache WHERE key=?", [key]).fetchone()
+        return result is not None
+    
+    def clear(self):
+        self.connection.execute("DELETE FROM cache")
+
+# Replace the original Cache class with our custom implementation
+original_cache_init = pandasai.helpers.cache.Cache.__init__
+
+def create_cache_instance(*args, **kwargs):
+    return CustomCache()
+
+# Monkey patch the Cache class
+pandasai.helpers.cache.Cache = CustomCache
 
 # Page config
 st.set_page_config(page_title="Portfolio Analysis AI", page_icon="📈", layout="wide")
@@ -15,7 +69,7 @@ st.write("# Portfolio Analysis AI 📈")
 
 # Load and prepare data
 def load_portfolio_data():
-    df = pd.read_csv('data/myport2.csv', parse_dates=['Date'], date_format='%Y%m%d')
+    df = pd.read_csv('data/myport2.csv', parse_dates=['Date'], date_parser=lambda x: pd.to_datetime(x, format='%Y%m%d'))
     df.set_index('Date', inplace=True)
     return df.dropna()
 
@@ -67,16 +121,21 @@ with col3:
     st.metric("Annualized Return", f"{portfolio_return:.2%}")
 
 # Initialize PandasAI
-ollama_llm = LocalLLM(api_base="http://localhost:11434/v1", model="qwen2.5-coder:32b")
+# Check if OpenAI API key is available
+api_key = os.getenv("OPENAI_API_KEY")
+if not api_key:
+    api_key = st.text_input("Enter your OpenAI API key:", type="password")
+    if not api_key:
+        st.warning("Please enter your OpenAI API key to use the AI features.")
+        st.stop()
+
+llm = OpenAI(api_token=api_key)
 smart_df = SmartDataframe(
     filtered_df,
     config={
-        "llm": ollama_llm,
-        "custom_prompts": {
-            "generate_python_code": "Generate Python code to answer the following question about the dataframe: {question}"
-        },
-        "cache": None,
-        "use_cache": False
+        "llm": llm,
+        "verbose": True,
+        "enforce_privacy": False
     }
 )
 
@@ -146,7 +205,7 @@ with tab3:
                         # Display visualization if available
                         if result is not None:
                             st.subheader("Visualization")
-                            if isinstance(result, (go.Figure, px.Figure)):
+                            if isinstance(result, go.Figure):
                                 st.plotly_chart(result, use_container_width=True)
                             elif str(type(result).__module__).startswith('matplotlib'):
                                 st.pyplot(result)
