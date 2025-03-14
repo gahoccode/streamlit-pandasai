@@ -91,6 +91,30 @@ def execute_and_capture_output(code, local_vars):
         
     return redirected_output.getvalue(), result
 
+def process_query(query, df):
+    if not query:
+        return None
+    
+    # Add visualization request to the query if not already present
+    if "visualization" not in query.lower() and "chart" not in query.lower() and "plot" not in query.lower():
+        query += " Create a line chart visualization showing this data over time."
+    elif "visualization" in query.lower() and "line chart" not in query.lower():
+        query = query.replace("visualization", "line chart visualization")
+    
+    try:
+        st.info("Running PandasAI with openai LLM...")
+        result = df.chat(query)
+        
+        # If result is just a string and no visualization, try again with more explicit request
+        if isinstance(result, str) and "chart" in query.lower():
+            enhanced_query = f"Create a line chart visualization showing {query}. Return the chart object, not just text."
+            result = df.chat(enhanced_query)
+            
+        return result
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        return None
+
 # Load data
 df = load_portfolio_data()
 
@@ -120,24 +144,44 @@ with col3:
     portfolio_return = returns.mean().mean() * 252  # Annualized return
     st.metric("Annualized Return", f"{portfolio_return:.2%}")
 
-# Initialize PandasAI
-# Check if OpenAI API key is available
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    api_key = st.text_input("Enter your OpenAI API key:", type="password")
+# Initialize PandasAI with OpenAI
+def initialize_pandasai(df):
+    # Get OpenAI API key from environment variable or Streamlit secrets
+    api_key = os.getenv("OPENAI_API_KEY")
+    
+    # If not found in environment, ask user to input it
     if not api_key:
-        st.warning("Please enter your OpenAI API key to use the AI features.")
-        st.stop()
+        api_key = st.sidebar.text_input("Enter your OpenAI API Key:", type="password")
+        if not api_key:
+            st.warning("Please enter your OpenAI API key to use the AI features.")
+            return None
+    
+    # Initialize OpenAI LLM
+    llm = OpenAI(api_token=api_key)
+    
+    # Create SmartDataframe with explicit config for visualizations
+    smart_df = SmartDataframe(
+        df, 
+        config={
+            "llm": llm,
+            "enable_cache": True,
+            "save_charts": True,
+            "verbose": True,
+            "enforce_privacy": False,
+            "save_charts_path": "./",
+            "open_charts": False,
+            "max_retries": 3,
+            "use_error_correction_framework": True
+        }
+    )
+    
+    return smart_df
 
-llm = OpenAI(api_token=api_key)
-smart_df = SmartDataframe(
-    filtered_df,
-    config={
-        "llm": llm,
-        "verbose": True,
-        "enforce_privacy": False
-    }
-)
+# Initialize PandasAI
+smart_df = initialize_pandasai(filtered_df)
+
+if smart_df is None:
+    st.stop()
 
 # Create tabs for different analyses
 tab1, tab2, tab3 = st.tabs(["Price Chart", "Portfolio Analysis", "AI Assistant"])
@@ -176,44 +220,27 @@ with tab3:
     if query:
         with st.spinner('Analyzing...'):
             try:
-                response = smart_df.chat(query)
-                st.write("Response:", response)
+                response = process_query(query, smart_df)
                 
-                # Display the generated code and execute it
-                if smart_df.last_code_generated:
-                    with st.expander("View Generated Analysis Code"):
-                        st.code(smart_df.last_code_generated, language="python")
-                        
-                        # Create local variables for code execution
-                        local_vars = {
-                            'df': filtered_df,
-                            'pd': pd,
-                            'px': px,
-                            'go': go,
-                            'plt': plt,
-                            'np': np
-                        }
-                        
-                        # Execute the code and capture output
-                        output, result = execute_and_capture_output(smart_df.last_code_generated, local_vars)
-                        
-                        # Display any printed output
-                        if output.strip():
-                            st.text("Output:")
-                            st.text(output)
-                        
-                        # Display visualization if available
-                        if result is not None:
-                            st.subheader("Visualization")
-                            if isinstance(result, go.Figure):
-                                st.plotly_chart(result, use_container_width=True)
-                            elif str(type(result).__module__).startswith('matplotlib'):
-                                st.pyplot(result)
-                            elif isinstance(result, pd.DataFrame):
-                                st.dataframe(result)
-                            else:
-                                st.write(result)
-                                
+                # Check if response is a string or a visualization
+                if isinstance(response, str):
+                    st.write("Response:", response)
+                else:
+                    st.write("Analysis complete! Here's what I found:")
+                
+                # Display the visualization if available
+                if hasattr(response, 'figure') or isinstance(response, go.Figure):
+                    st.plotly_chart(response, use_container_width=True)
+                elif str(type(response).__module__).startswith('matplotlib'):
+                    st.pyplot(response)
+                elif isinstance(response, pd.DataFrame):
+                    st.dataframe(response)
+                
+                # Check for saved chart files
+                chart_files = [f for f in os.listdir('./') if f.endswith('.png') and f.startswith('temp_chart')]
+                for chart_file in chart_files:
+                    st.image(chart_file, caption="Generated Visualization")
+                    
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
 
